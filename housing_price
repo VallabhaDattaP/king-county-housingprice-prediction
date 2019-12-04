@@ -1,0 +1,152 @@
+#install.packages("ggplot2")
+#install.packages("tidyverse")
+#install.packages("skimr")
+#install.packages("caret")
+#install.packages("corrplot")
+#install.packages("moments")
+#install.packages("MLmetrics")
+#install.packages("pROC")
+#library(ggplot2)
+#library(tidyverse)
+#library(skimr)
+#library(caret)
+#library(corrplot)
+#library(moments)
+#library(MLmetrics)
+#library(pROC)
+
+# ------------ IMPORTING DATA ---------;
+housing_data <- read.csv("KC_housing_data.csv")
+
+# ------------ START OF DATA VISUALIZATION --------;
+# ------------ BOX PLOTS -------------------------;
+bwplot(~bedrooms, data = housing_data)    #( few outliers but one big notable outlier on 33)
+bwplot(~price, data = housing_data)       #( high price outliers)
+bwplot(~bathrooms, data = housing_data)   #( both side outliers but few noticable outliers near 8)
+bwplot(~sqft_living, data = housing_data) #( big area outliers)
+bwplot(~sqft_lot, data = housing_data)    #( mostly not much lot area but few outliers are there)
+bwplot(~floors, data = housing_data)      
+bwplot(~waterfront, data = housing_data)  #( mostly no waterfront)
+bwplot(~view, data = housing_data)        #( mostly zero view)
+bwplot(~condition, data = housing_data)   #( very little low condition outlier)
+bwplot(~sqft_above, data = housing_data)  #( high area outliers)
+bwplot(~sqft_basement, data = housing_data) #( high area outliers)
+bwplot(~num_years, data = housing_data)         #( mostly between 20-60)
+
+# ------------ HISTOGRAMS -----------------------;
+ggplot(data = housing_data) + geom_histogram(mapping = aes(x = `price`))
+ggplot(data = housing_data) + geom_histogram(mapping = aes(x = `bedrooms`))
+ggplot(data = housing_data) + geom_histogram(mapping = aes(x = `bathrooms`))
+ggplot(data = housing_data) + geom_histogram(mapping = aes(x = `sqft_living`))
+ggplot(data = housing_data) + geom_histogram(mapping = aes(x = `sqft_lot`))
+ggplot(data = housing_data) + geom_histogram(mapping = aes(x = `floors`))
+ggplot(data = housing_data) + geom_histogram(mapping = aes(x = `sqft_above`))
+ggplot(data = housing_data) + geom_histogram(mapping = aes(x = `sqft_basement`))
+ggplot(data = housing_data) + geom_histogram(mapping = aes(x = `yr_renovated`))
+ggplot(data = housing_data) + geom_histogram(mapping = aes(x = `num_years`))
+
+# --------------- SCATTER PLOTS ---------------;
+ggplot(data = housing_data, mapping = aes(x = bedrooms, y = price)) + geom_point(colour = 'lightblue') + geom_smooth(method = 'lm')
+#install.packages("car")
+#library(car)
+ggplot(data = housing_data, mapping = aes(x = bathrooms, y = price)) + geom_point(colour = 'lightblue') + geom_smooth(method = 'lm')
+ggplot(data = housing_data, mapping = aes(x = sqft_living, y = price)) + geom_point(colour = 'lightblue') + geom_smooth(method = 'lm')
+ggplot(data = housing_data, mapping = aes(x = sqft_lot, y = price)) + geom_point(colour = 'lightblue') + geom_smooth(method = 'lm')
+ggplot(data = housing_data, mapping = aes(x = floors, y = price)) + geom_point(colour = 'lightblue') + geom_smooth(method = 'lm')
+ggplot(data = housing_data, mapping = aes(x = condition, y = price)) + geom_point(colour = 'lightblue') + geom_smooth(method = 'lm')
+ggplot(data = housing_data, mapping = aes(x = sqft_above, y = price)) + geom_point(colour = 'lightblue') + geom_smooth(method = 'lm')
+ggplot(data = housing_data, mapping = aes(x = num_years, y = price)) + geom_point(colour = 'lightblue') + geom_smooth(method = 'lm')
+
+# ------------ END OF DATA VISUALIZATION -----------;
+
+# ------------ START OF DATA CLEANING -----------;
+
+housing_data$date <- as.Date(as.Date(as.character(housing_data$date),"%Y-%m-%d"))
+housing_data$num_years <- as.numeric(format(housing_data$date, "%Y")) - housing_data$yr_built
+housing_data <- housing_data[-c(1,13)] # Dropped Date and yr_built
+housing_data$condition <- as.factor(housing_data$condition)
+housing_data$view <- as.factor(housing_data$view)
+housing_data$waterfront <- as.factor(housing_data$waterfront)
+table(is.na(housing_data))
+housing_data$yr_renovated <- as.numeric(housing_data$yr_renovated != 0)
+unique(housing_data$bedrooms)
+table(housing_data$bedrooms)
+unique(housing_data$bathrooms)
+table(housing_data$bathrooms)
+housing_data[2366,2] <- 3     # Replacing value from most similar row
+housing_data[2366,3] <- 2.5   # Replacing value from most similar row
+housing_data[3210,2] <- 5     # Replacing value from most similar row
+housing_data[3210,3] <- 3.25  # Replacing value from most similar row
+housing_data <- housing_data[-c(123),] # Deleting observation 123 (Outlier)
+nearZeroVar(housing_data)   # Checking which variables have least importance
+housing_data <- housing_data[-c(7,8,11,16)]  # Dropping waterfront, View, sqft_basement, country
+housing_data_plot <- housing_data[-c(7,10,11,12)] # Extracting only numerical variables to plot correlation plot
+cor(housing_data_plot)
+corrplot(cor(housing_data_plot),type="lower",method="color",addCoef.col = "Black",tl.col = "Black")
+# ---------- END OF DATA CLEANING ---------;
+
+# ---------- START OF DATA MODELLING ------;
+# ---------- KNN Procedure ----------------;
+housing_knn <- housing_data
+
+# Changing Price variable into categorical variable to perform Knn;
+# And creating new variable called price_category instead of price; 
+housing_knn$price_category[housing_knn$price < 500000] <- "LowPrice"
+housing_knn$price_category[housing_knn$price > 500000 & housing_knn$price <= 900000] <- "MediumPrice"
+housing_knn$price_category[housing_knn$price > 900000] <- "HighPrice"
+housing_knn$price_category = factor(housing_knn$price_category,
+                       levels=c("LowPrice", "MediumPrice", "HighPrice"))
+unique(housing_knn$price_category)
+table(is.na(housing_knn$price_category))
+housing_knn$price_category[is.na(housing_knn$price_category)] <- "LowPrice"  # Assigning low price to missing values;
+housing_knn <- housing_knn[-c(1,10)] # Dropping "Price" and "Street" variables;
+set.seed(137)
+
+# Splitting data into train and test;
+inTrain <- createDataPartition(y = housing_knn$price_category, p = 0.75, list = FALSE)
+training_set <- housing_knn[inTrain,] # Training set
+testing_set <- housing_knn[-inTrain,] # Testing set
+Scaled <- preProcess(training_set, method = c("center", "scale"))
+train_transformed <- predict(Scaled, training_set)
+test_transformed <- predict(Scaled, testing_set)
+
+# Performing 3 fold cross validation;
+fitControl <- trainControl(method = "repeatedcv", number = 3, repeats = 3)
+knn1 <- train(price_category ~ ., data = train_transformed, method = "knn",  trControl = fitControl)
+knn1
+plot(knn1)
+# ----------- END OF MODELLING KNN 1 -------------;
+
+# ----------- START OF MODEL 1 EVALUATION --------;
+varImp(knn1)
+pred <- predict(knn1, newdata = test_transformed)
+confusionMatrix(pred, testing_set$price_category)
+confusionMatrix(pred, testing_set$price_category, mode = "prec_recall")
+# ----------- END OF MODEL 1 EVALUATION ----------;
+
+# ----------- KNN 2 ---------- ;
+# Performing 7 fold cross validation;
+fitControl_prob <- trainControl(method = "repeatedcv", number = 7, repeats = 7,  classProbs = TRUE)
+knn2 <- train( price_category~ ., data = train_transformed, method = "knn",  trControl = fitControl_prob, metric='ROC')
+knn2
+plot(knn2)
+
+# ----------- START OF MODEL 2 EVALUATION -----------;
+varImp(knn2)
+pred2 <- predict(knn2, newdata = test_transformed)
+confusionMatrix(pred2, testing_set$price_category)
+confusionMatrix(pred2, testing_set$price_category, mode = "prec_recall")
+
+# --------- predicting the probability that a given point falls in the target class, to compute some additional metrics ------------;
+fitControl_prob <- trainControl(method = "repeatedcv", number = 7, repeats = 7,  classProbs = TRUE, summaryFunction = multiClassSummary)
+knn2 <- train(price_category ~ ., data = train_transformed, method = "knn",  trControl = fitControl_prob, metric='ROC')
+knn2
+
+# --------- Predicting the probabilities of the testing data ---------;
+pred2 <- predict(knn2, newdata = test_transformed, type = "prob")
+
+# ---------- Creating an ROC curve for the model ----------;
+plot(roc((testing_set$price_category),pred2[,1]), print.auc=TRUE)
+
+# ---------- END OF DATA EVALUATION ----------;
+# ---------- END OF CODE ---------------------;
